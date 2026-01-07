@@ -4,23 +4,30 @@ phases:
   install:
     runtime-versions:
       python: 3.11
+    commands:
+      - echo "Instalando dependências necessárias..."
+      - pip install --upgrade pip
+      - pip install jq --quiet || true  # caso queira usar jq no ambiente
 
   build:
     commands:
-      - echo "Procurando lambdas..."
+      - echo "Procurando lambdas em lambda_src..."
       - |
-        for dir in lambdas/*; do
-          echo "Processando $dir"
+        for dir in lambda_src/*; do
+          echo "Processando lambda em $dir"
 
-          FUNCTION_NAME=$(jq -r .function_name $dir/lambda.json)
+          # Lê o nome da função do JSON
+          FUNCTION_NAME=$(jq -r .function_name "$dir/lambda.json")
 
+          # Navega para a pasta da lambda e zipa tudo
           cd $dir
-          zip function.zip handler.py
+          zip -r function.zip .
 
+          # Atualiza a função no AWS Lambda
           aws lambda update-function-code \
             --function-name $FUNCTION_NAME \
             --zip-file fileb://function.zip \
-            --region $AWS_REGION
+            --region us-east-1
 
           cd -
         done
