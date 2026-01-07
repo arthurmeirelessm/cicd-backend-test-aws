@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+
+  build:
+    commands:
+      - echo "Procurando lambdas..."
+      - |
+        for dir in lambdas/*; do
+          echo "Processando $dir"
+
+          FUNCTION_NAME=$(jq -r .function_name $dir/lambda.json)
+
+          cd $dir
+          zip function.zip handler.py
+
+          aws lambda update-function-code \
+            --function-name $FUNCTION_NAME \
+            --zip-file fileb://function.zip \
+            --region $AWS_REGION
+
+          cd -
+        done
