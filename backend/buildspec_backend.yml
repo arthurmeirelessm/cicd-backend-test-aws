@@ -7,27 +7,83 @@ phases:
     commands:
       - echo "Instalando dependências necessárias..."
       - pip install --upgrade pip
-      - pip install jq --quiet || true  # caso queira usar jq no ambiente
 
   build:
     commands:
+      - echo "Iniciando deploy das lambdas..."
+      - cd backend  # Navegar para a pasta backend primeiro
       - echo "Procurando lambdas em lambda_src..."
+      
       - |
         for dir in lambda_src/*; do
-          echo "Processando lambda em $dir"
-
-          # Lê o nome da função do JSON
-          FUNCTION_NAME=$(jq -r .function_name "$dir/lambda.json")
-
-          # Navega para a pasta da lambda e zipa tudo
-          cd $dir
-          zip -r function.zip .
-
-          # Atualiza a função no AWS Lambda
-          aws lambda update-function-code \
-            --function-name $FUNCTION_NAME \
-            --zip-file fileb://function.zip \
-            --region us-east-1
-
-          cd -
+          if [ -d "$dir" ]; then
+            echo "========================================="
+            echo "Processando lambda em: $dir"
+            
+            # Verificar se existe lambda.json
+            if [ ! -f "$dir/lambda.json" ]; then
+              echo "⚠️  Arquivo lambda.json não encontrado em $dir, pulando..."
+              continue
+            fi
+            
+            # Ler o nome da função do JSON
+            FUNCTION_NAME=$(cat "$dir/lambda.json" | grep -o '"function_name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)".*/\1/')
+            echo "Nome da função: $FUNCTION_NAME"
+            
+            # Navegar para a pasta da lambda
+            cd "$dir"
+            
+            # Remover zip antigo se existir
+            rm -f function.zip
+            
+            # Zipar todos os arquivos
+            echo "Criando zip..."
+            zip -r function.zip . -x "*.json" -x "*.md"
+            
+            # Verificar se o zip foi criado
+            if [ ! -f function.zip ]; then
+              echo "❌ Erro ao criar zip"
+              cd ../..
+              continue
+            fi
+            
+            echo "Atualizando função Lambda: $FUNCTION_NAME"
+            
+            # Atualizar a função no AWS Lambda
+            aws lambda update-function-code \
+              --function-name "$FUNCTION_NAME" \
+              --zip-file fileb://function.zip \
+              --region us-east-1
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Lambda $FUNCTION_NAME atualizada com sucesso!"
+            else
+              echo "❌ Erro ao atualizar Lambda $FUNCTION_NAME"
+            fi
+            
+            # Voltar para o diretório backend
+            cd ../..
+            
+            echo "========================================="
+          fi
         done
+      
+      - echo "✅ Deploy das lambdas concluído!"
+
+  post_build:
+    commands:
+      - echo "Build finalizado em $(date)"
+```
+
+### 2️⃣ **Estrutura de Pastas Esperada:**
+```
+cicd-backend-test-aws/
+├── backend/
+│   ├── lambda_src/
+│   │   └── hello_world/
+│   │       ├── handler.py
+│   │       └── lambda.json
+│   └── buildspec_backend.yml
+└── infra/
+    └── application/
+        └── main.tf
