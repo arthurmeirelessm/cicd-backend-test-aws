@@ -73,17 +73,3 @@ phases:
   post_build:
     commands:
       - echo "Build finalizado em $(date)"
-```
-
-### 2️⃣ **Estrutura de Pastas Esperada:**
-```
-cicd-backend-test-aws/
-├── backend/
-│   ├── lambda_src/
-│   │   └── hello_world/
-│   │       ├── handler.py
-│   │       └── lambda.json
-│   └── buildspec_backend.yml
-└── infra/
-    └── application/
-        └── main.tf
